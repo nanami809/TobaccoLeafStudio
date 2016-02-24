@@ -39,8 +39,8 @@ void FileList::getList(const char *initDir, const char *specfile){
 //存储输出图片
 void WriteBMP(string file_name, int file_num, Mat& r, Mat& t)//
 {
-	string dst_pathname1 = "C:/Users/eva72/Desktop/烟叶CACHE/";
-	char temp[2];
+	string dst_pathname1 = "C:/Users/eva72/Desktop/烟叶CACHE/图像分割/";
+	char temp[4];
 	itoa(file_num + 1, temp, 10);
 	string dst_num = temp;
 	imwrite(dst_pathname1 + dst_num + "反_" + file_name, r);
@@ -135,37 +135,45 @@ void SegmentationImage(Mat &img_R, Mat &img_T){
 
 	int new_rows = img_T.rows / 3;
 	int new_cols = img_T.cols / 3;
-	Mat mean_img(Size(new_cols, new_rows), CV_32FC1);
-	Mat std_img(Size(new_cols, new_rows), CV_32FC1);
+	Mat mean_img(Size(img_T.cols-2, img_T.rows - 2), CV_8UC1);
+	Mat cv_img(Size(img_T.cols - 2, img_T.rows - 2), CV_8UC1);
 	vector<Mat> channels_T;
 	split(img_T, channels_T);
-	for (int i = 0; i < new_rows; i++){
-		for (int j = 0; j < new_cols; j++){
+	Mat img_Counter(Size(img_T.cols, img_T.rows ), CV_8UC3, Scalar(0,0,0));
+
+	for (int i = 0; i < img_T.rows-2; i++){
+		for (int j = 0; j < img_T.cols-2; j++){
 			
-			Mat rect_Blue_T = channels_T[0](Rect(Point(3 * j, 3 * i), Point(3 * j + 3, 3 * i + 3)));
+			Mat rect_Blue_T = channels_T[0](Rect(Point(j, i), Point(j + 3, i + 3)));
 			Mat mean_Mat, std_Mat;
 			meanStdDev(rect_Blue_T, mean_Mat, std_Mat);		
 			double mean_rect = mean_Mat.at<double>(0, 0);
 			double std_rect = std_Mat.at<double>(0, 0);
-			mean_img.at<float>(i, j) =(float) mean_rect;
-			std_img.at<float>(i, j) = (float) std_rect;
+			mean_img.at<uchar>(i, j) =(uchar) mean_rect;
+			if (mean_rect != 0){
+				cv_img.at<uchar>(i, j) = (uchar)(std_rect / mean_rect/3*255);
+			}
+			else cv_img.at<uchar>(i, j) = 0;
 		}
 	}
 
-	int t_mean = Getthreshold(mean_img);//单通道图像
-	int t_std = Getthreshold(std_img);//单通道图像
+	int t_mean = Getthreshold_Gray(mean_img);//单通道图像
+	int t_cv = threshold(cv_img, cv_img, 0, 255, CV_THRESH_OTSU);
+	
 
-	Mat temp;
 	threshold(mean_img, mean_img, t_mean, 255, CV_THRESH_BINARY);
-	threshold(std_img, std_img, t_std, 255, CV_THRESH_BINARY);
+	//threshold(cv_img, cv_img, t_cv, 255, CV_THRESH_BINARY);
 
-	for(int i = 0; i < new_rows; i++){
-		for (int j = 0; j < new_cols; j++){
-			if (mean_img.at<float>(i, j) == 0){
+
+	for(int i = 0; i < mean_img.rows; i++){
+		for (int j = 0; j < mean_img.cols; j++){
+			if (mean_img.at<uchar>(i, j) == 0){
 				//烟叶
-				if (img_R.at<Vec3b>(3 * i, 3 * j)[0] > img_R.at<Vec3b>(3 * i, 3 * j)[2]){//背景边缘
-					Mat window_T = img_T(Rect(Point(3 * j, 3 * i), Point(3 * j + 3, 3 * i + 3)));
-					Mat window_R = img_R(Rect(Point(3 * j, 3 * i), Point(3 * j + 3, 3 * i + 3)));
+				if (img_R.at<Vec3b>(i, j)[0] > img_R.at<Vec3b>(i, j)[2]){
+					//背景边缘
+					
+					Mat window_T = img_T(Rect(Point(j, i), Point(j + 3, i + 3)));
+					Mat window_R = img_R(Rect(Point(j, i), Point(j + 3, i + 3)));
 					Mat white(3, 3, CV_8UC3, Scalar(255, 255, 255));
 					Mat black(3, 3, CV_8UC3, Scalar(0, 0, 0));
 					white.copyTo(window_R);
@@ -173,36 +181,51 @@ void SegmentationImage(Mat &img_R, Mat &img_T){
 				}				
 			}
 			else{
-				if (std_img.at<float>(i, j) != 0){  //边缘
-					Mat window_T = img_T(Rect(Point(3 * j, 3 * i), Point(3 * j + 3, 3 * i + 3)));
-					Mat window_R = img_R(Rect(Point(3 * j, 3 * i), Point(3 * j + 3, 3 * i + 3)));
+				if (cv_img.at<uchar>(i, j) != 0){  
+					//边缘			
+
+					Mat window_T = img_T(Rect(Point(j, i), Point(j + 3, i + 3)));
+					
+					Mat window_C = img_Counter(Rect(Point(j, i), Point(j + 3, i + 3)));
+					window_T.copyTo(window_C);
+					/*
+					Mat window_R = img_R(Rect(Point(j, i), Point(j + 3, i + 3)));
+					for (int m = 0; m < 3; m++){
+						for (int n = 0; n < 3; n++){
+							if (window_T.at<Vec3b>(m, n)[0]> t_mean)	{
+								//背景
+								window_T.at<Vec3b>(m, n) = { 0, 0, 0 };
+								window_R.at<Vec3b>(m, n) = { 255, 255, 255 };
+							}
+						}
+					}
+					*/
+					
+				}
+				else {  
+					//背景
+					Mat window_T = img_T(Rect(Point(j, i), Point(j + 3, i + 3)));
+					Mat window_R = img_R(Rect(Point(j, i), Point(j + 3, i + 3)));
 					Mat white(3, 3, CV_8UC3, Scalar(255, 255, 255));
 					Mat black(3, 3, CV_8UC3, Scalar(0, 0, 0));
 					white.copyTo(window_R);
 					black.copyTo(window_T);
-					/*
-					Mat window_T = img_T(Rect(Point(3 * j, 3 * i), Point(3 * j + 3, 3 * i + 3)));
-					Mat window_R = img_R(Rect(Point(3 * j, 3 * i), Point(3 * j + 3, 3 * i + 3)));
-					for (int m = 0; m < 3; m++){
-						for (int n = 0; n < 3; n++){
-							if (window_T.at<Vec3b>(m, n)[0]>0)	{//背景
-								window_T.at<Vec3b>(m, n) = { 0, 0, 0 };
-								window_R.at<Vec3b>(m, n) = { 255, 255, 255 };
-							}
-
-						}
-					}
-					*/
-
 				}
-				else {  //背景
-					Mat window_T = img_T(Rect(Point(3 * j, 3 * i), Point(3 * j + 3, 3 * i + 3)));
-					Mat window_R = img_R(Rect(Point(3 * j, 3 * i), Point(3 * j + 3, 3 * i + 3)));
-					Mat white(3, 3, CV_8UC3, Scalar(255, 255, 255));
-					Mat black(3, 3, CV_8UC3, Scalar(0, 0, 0));
-					white.copyTo(window_R);
-					black.copyTo(window_T);					
-				}
+			}
+		}
+	}
+	
+	vector<Mat> channels_C;
+	split(img_Counter, channels_C);
+	Mat temp = channels_C[0];
+	int t_C = Getthreshold_Gray(temp);
+	threshold(temp, temp, t_C, 255, CV_THRESH_BINARY);
+	for (int m = 0; m < temp.rows; m++){
+		for (int n = 0; n < temp.cols; n++){
+			if (temp.at<uchar>(m, n)!=0)	{
+				//背景
+				img_T.at<Vec3b>(m, n) = { 0, 0, 0 };
+				img_R.at<Vec3b>(m, n) = { 255, 255, 255 };
 			}
 		}
 	}
@@ -259,7 +282,7 @@ void SegmentationImage(Mat &img_R, Mat &img_T){
 
 
 
-int Getthreshold(Mat &srcImage){
+int Getthreshold_Gray(Mat &srcImage){
 	int i;
 
 	//【2】参数准备
@@ -269,6 +292,50 @@ int Getthreshold(Mat &srcImage){
 	const float* ranges[] = { range };
 	MatND redHist, grayHist, blueHist;
 
+	/*
+
+	//【3】进行直方图的计算（红色分量部分）
+	calcHist(&srcImage, 1, channels_r, Mat(), //不使用掩膜
+	redHist, 1, hist_size, ranges,
+	true, false);
+
+	//【4】进行直方图的计算（绿色分量部分）
+	int channels_g[] = { 1 };
+	calcHist(&srcImage, 1, channels_g, Mat(), // do not use mask
+	grayHist, 1, hist_size, ranges,
+	true, // the histogram is uniform
+	false);
+	*/
+	//【5】进行直方图的计算（蓝色分量部分）
+	int channels_b[] = { 0 };
+	calcHist(&srcImage, 1, channels_b, Mat(), // do not use mask
+		blueHist, 1, &hist_size, ranges);
+	medianBlur(blueHist, blueHist, 3);
+
+
+	//查找阈值
+	double maxValue_blue;
+	Point maxIdx_blue;
+	minMaxLoc(blueHist, 0, &maxValue_blue, 0, &maxIdx_blue);
+	if (maxIdx_blue.y == 0){
+		for (i = 1; i < 256; i++){
+			if (blueHist.at<float>(i) > blueHist.at<float>(i - 1)){
+				break;
+			}
+		}
+	}
+	else i = 0;
+	return i-1;
+}
+
+int Getthreshold_CV(Mat &srcImage){
+	int i;
+	//【2】参数准备
+
+	int hist_size = 300;
+	float range[] = { 0, 3 };
+	const float* ranges[] = { range };
+	MatND redHist, grayHist, blueHist;
 
 	/*
 
@@ -289,21 +356,28 @@ int Getthreshold(Mat &srcImage){
 	calcHist(&srcImage, 1, channels_b, Mat(), // do not use mask
 		blueHist, 1, &hist_size, ranges);
 	medianBlur(blueHist, blueHist, 5);
+	Mat temp= 	(Mat)blueHist;
 
+	
+
+
+	/*
 
 	//查找阈值
 	double maxValue_blue;
 	Point maxIdx_blue;
 	minMaxLoc(blueHist, 0, &maxValue_blue, 0, &maxIdx_blue);
 	if (maxIdx_blue.y == 0){
-		for (i = 1; i < 256; i++){
+		for (i = 1; i < 300; i++){
 			if (blueHist.at<float>(i) > blueHist.at<float>(i - 1)){
 				break;
 			}
 		}
 	}
 	else i = 0;
-	return i-1;
+	return i - 1;
+	*/
+	return i;
 }
 
 

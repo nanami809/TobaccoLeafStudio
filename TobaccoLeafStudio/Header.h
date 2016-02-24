@@ -17,7 +17,8 @@ void BlurImage(Mat &r, Mat &t, Mat &dst_r, Mat &dst_t);
 void ColorCorect(Rect window, Mat &r, Mat &t, Mat &dst_r, Mat &dst_t);
 void CalCorect(Scalar w_rgb, Scalar b_rgb, Mat &r, Mat &t, Mat& dst_r, Mat& dst_t);
 void SegmentationImage(Mat &img_R, Mat &img_T);
-int Getthreshold(Mat &srcImage);
+int Getthreshold_Gray(Mat &srcImage);
+int Getthreshold_CV(Mat &srcImage);
 
 
 //¿‡
