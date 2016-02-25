@@ -1,5 +1,17 @@
 #include"Header.h"
 
+//图像填补
+void FillImage( Mat &t){
+	for (int i = 0; i <t.rows; i++){
+		for (int j = 0; j < t.cols; j++){
+			Scalar temp = t.at<Vec3b>(i, j);
+			if (temp[0] == 255 && temp[1] == 255 && temp[2] == 255)
+				t.at<Vec3b>(i, j) = { 0, 0, 0 };
+		}
+	}
+}
+
+
 //图像平滑
 void BlurImage(Mat &r, Mat &t, Mat &dst_r, Mat &dst_t){
 	bilateralFilter(r, dst_r, 15, 15 * 2, 15 / 2);//双边滤波
@@ -128,23 +140,37 @@ void ColorCorect(Rect window, Mat &r, Mat &t, Mat &dst_r, Mat &dst_t){
 
 
 
-void SegmentationImage(Mat &img_R, Mat &img_T){
-
-	
 
 
-	int new_rows = img_T.rows / 3;
-	int new_cols = img_T.cols / 3;
-	Mat mean_img(Size(img_T.cols-2, img_T.rows - 2), CV_8UC1);
+void SegmentationImage(Mat &r, Mat &t,Mat &dst_r,Mat &dst_t){
+
+	//建立输出图片
+	Mat img_R(r.rows,r.cols,CV_8UC3,Scalar(255,255,255));
+	Mat img_T(t.rows, t.cols, CV_8UC3, Scalar(0, 0, 0));
+
+
+	//分析反射图像红蓝差的矩阵
+	Mat D_redblue(r.rows, r.cols, CV_8UC1);
+	for (int i = 0; i < t.rows; i++){
+		for (int j = 0; j < t.cols; j++){
+			Scalar temp = r.at<Vec3b>(i, j);
+			if (temp[2] - temp[0]<0)D_redblue.at<uchar>(i, j) = 0;
+			else 			D_redblue.at<uchar>(i, j) = (uchar)(temp[2] - temp[0]);
+		}
+	}
+	int t_DRB = Getthreshold_Gray(D_redblue);
+
+	//记录边缘区域的矩阵
+	Mat img_Counter1(Size(t.cols, t.rows), CV_8UC3, Scalar(0, 0, 0));
+	Mat img_Counter2(Size(t.cols, t.rows), CV_8UC3, Scalar(255, 255, 255));//记录边缘	
+	//计算均值和变异系数分布
+	Mat mean_img(Size(img_T.cols - 2, img_T.rows - 2), CV_8UC1);
 	Mat cv_img(Size(img_T.cols - 2, img_T.rows - 2), CV_8UC1);
 	vector<Mat> channels_T;
-	split(img_T, channels_T);
-	Mat img_Counter(Size(img_T.cols, img_T.rows ), CV_8UC3, Scalar(0,0,0));
-
-	for (int i = 0; i < img_T.rows-2; i++){
-		for (int j = 0; j < img_T.cols-2; j++){
-			
-			Mat rect_Blue_T = channels_T[0](Rect(Point(j, i), Point(j + 3, i + 3)));
+	split(t, channels_T);//分离透射图像蓝色值
+	for (int i = 0; i < t.rows-2; i++){
+		for (int j = 0; j < t.cols-2; j++){
+			Mat rect_Blue_T = channels_T[0](Rect(Point(j, i), Point(j + 3, i + 3)));//3×3矩阵
 			Mat mean_Mat, std_Mat;
 			meanStdDev(rect_Blue_T, mean_Mat, std_Mat);		
 			double mean_rect = mean_Mat.at<double>(0, 0);
@@ -158,36 +184,32 @@ void SegmentationImage(Mat &img_R, Mat &img_T){
 	}
 
 	int t_mean = Getthreshold_Gray(mean_img);//单通道图像
-	int t_cv = threshold(cv_img, cv_img, 0, 255, CV_THRESH_OTSU);
+	int t_cv = threshold(cv_img, cv_img, 0, 255, CV_THRESH_OTSU);//变异系数分割，标示边缘
 	
 
-	threshold(mean_img, mean_img, t_mean, 255, CV_THRESH_BINARY);
+	threshold(mean_img, mean_img, t_mean, 255, CV_THRESH_BINARY);//平均值分割，标示烟叶部分
 	//threshold(cv_img, cv_img, t_cv, 255, CV_THRESH_BINARY);
 
 
 	for(int i = 0; i < mean_img.rows; i++){
 		for (int j = 0; j < mean_img.cols; j++){
+			Rect window = Rect(Point(j, i), Point(j + 3, i + 3));//3×3大小窗口单步扫描
 			if (mean_img.at<uchar>(i, j) == 0){
-				//烟叶
-				if (img_R.at<Vec3b>(i, j)[0] > img_R.at<Vec3b>(i, j)[2]){
-					//背景边缘
-					
-					Mat window_T = img_T(Rect(Point(j, i), Point(j + 3, i + 3)));
-					Mat window_R = img_R(Rect(Point(j, i), Point(j + 3, i + 3)));
-					Mat white(3, 3, CV_8UC3, Scalar(255, 255, 255));
-					Mat black(3, 3, CV_8UC3, Scalar(0, 0, 0));
-					white.copyTo(window_R);
-					black.copyTo(window_T);
+				//是烟叶				
+				Scalar temp = mean(r(window));
+				int blue = temp[0];
+				int red = temp[2];
+				if (red-blue>t_DRB){
+					//排除背景边缘	
+					r(window).copyTo(img_R(window));
+					t(window).copyTo(img_T(window));
 				}				
 			}
 			else{
 				if (cv_img.at<uchar>(i, j) != 0){  
-					//边缘			
-
-					Mat window_T = img_T(Rect(Point(j, i), Point(j + 3, i + 3)));
-					
-					Mat window_C = img_Counter(Rect(Point(j, i), Point(j + 3, i + 3)));
-					window_T.copyTo(window_C);
+					//边缘
+					t(window).copyTo(img_Counter1(window));
+					t(window).copyTo(img_Counter2(window));
 					/*
 					Mat window_R = img_R(Rect(Point(j, i), Point(j + 3, i + 3)));
 					for (int m = 0; m < 3; m++){
@@ -200,84 +222,57 @@ void SegmentationImage(Mat &img_R, Mat &img_T){
 						}
 					}
 					*/
-					
 				}
 				else {  
 					//背景
+					/*
 					Mat window_T = img_T(Rect(Point(j, i), Point(j + 3, i + 3)));
 					Mat window_R = img_R(Rect(Point(j, i), Point(j + 3, i + 3)));
 					Mat white(3, 3, CV_8UC3, Scalar(255, 255, 255));
 					Mat black(3, 3, CV_8UC3, Scalar(0, 0, 0));
 					white.copyTo(window_R);
 					black.copyTo(window_T);
+					*/
 				}
 			}
 		}
 	}
 	
+
+
 	vector<Mat> channels_C;
-	split(img_Counter, channels_C);
+	split(img_Counter2, channels_C);
 	Mat temp = channels_C[0];
 	int t_C = Getthreshold_Gray(temp);
 	threshold(temp, temp, t_C, 255, CV_THRESH_BINARY);
 	for (int m = 0; m < temp.rows; m++){
 		for (int n = 0; n < temp.cols; n++){
-			if (temp.at<uchar>(m, n)!=0)	{
+			if (temp.at<uchar>(m, n)==0)	{
 				//背景
-				img_T.at<Vec3b>(m, n) = { 0, 0, 0 };
+				img_T.at<Vec3b>(m, n) = t.at<Vec3b>(m, n);
+				img_R.at<Vec3b>(m, n) = r.at<Vec3b>(m, n);
+			}
+		}
+	}
+
+	split(img_Counter1, channels_C);
+	temp = channels_C[0];
+	threshold(temp, temp, t_C, 255, CV_THRESH_BINARY);
+	for (int m = 0; m < temp.rows; m++){
+		for (int n = 0; n < temp.cols; n++){
+			if (temp.at<uchar>(m, n) != 0)	{
+				//背景
+				img_T.at<Vec3b>(m, n) = {0,0,0};
 				img_R.at<Vec3b>(m, n) = { 255, 255, 255 };
 			}
 		}
 	}
 
-	
 
 
-	/*
-	
-	double t1, t2, t3;
-	t1 = threshold(new_img, temp, 20, 255, CV_THRESH_BINARY);
-	//t2 = threshold(new_img, temp, 0, 255, CV_THRESH_OTSU);
-	//t3 = threshold(new_img, temp, 0, 255, CV_THRESH_BINARY | CV_THRESH_OTSU);
+	img_R.copyTo(dst_r);
+	img_T.copyTo(dst_t);
 
-
-
-
-	for (int i = 0; i < img_T.rows / 3; i += 3){
-		for (int j = 0; j < img_T.cols / 3; j += 3){
-			Mat rect_R = img_R(Rect(Point(i, j), Point(i + 3, j + 3)));
-			Mat rect_T = img_T(Rect(Point(i, j), Point(i + 3, j + 3)));
-			vector<Mat> channels_T;
-			split(rect_T, channels_T);
-			Mat m_T, s_T;
-			meanStdDev(channels_T[0], m_T, s_T);
-			if (m_T.at<double>(0, 0) == 0){//考虑为烟叶部分
-				Scalar rgb = mean(rect_R);//考察相应得到反射图像
-				if (rgb[0] > rgb[2]){//反射图的背景蓝色大于红色
-					rect_R = Scalar::all(255);
-					rect_T = Scalar::all(0);
-				}
-			}
-			else{
-				if (s_T.at<double>(0, 0) > 1){//边缘部分
-					for (int k = 0; k < 3; k++){
-						for (int l = 0; l < 3; l++){
-							if (channels_T[0].at<uchar>(k, l) != 0){
-								rect_R.at<Vec3b>(k, l) = Vec3b(255, 255, 255);
-								rect_T.at<Vec3b>(k, l) = Vec3b(0, 0, 0);
-							}
-
-						}
-					}
-				}
-				else{//背景部分
-					cout << "背景" << endl;
-				}
-			}
-
-		}
-	}
-	*/
 }
 
 
