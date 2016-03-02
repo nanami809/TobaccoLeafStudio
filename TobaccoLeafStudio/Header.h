@@ -19,7 +19,9 @@ void CalCorect(Scalar w_rgb, Scalar b_rgb, Mat &r, Mat &t, Mat& dst_r, Mat& dst_
 void SegmentationImage(Mat &r, Mat &t, Mat &dst_r, Mat &dst_t);
 int Getthreshold_Gray(Mat &srcImage);
 int Getthreshold_CV(Mat &srcImage);
+int Getthreshold_DieDai(Mat &srcImage,Mat &dst);//单通道图像
 void FillImage(Mat &t);
+void Showhist(Mat &srcImage);
 
 
 //类
@@ -32,20 +34,5 @@ private:
 	string dir;
 	string spec;
 };
-
-
-
-//函数
-
-
-/*void showMat(Mat arr){
-	for (int i = 0; i < arr.rows; i++){
-		for (int j = 0; j < arr.cols; j++)
-			cout << arr.at<uchar>(i, j) << "\0";
-		cout << endl;
-	}
-}*/
-
-
 
 
