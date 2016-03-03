@@ -51,7 +51,7 @@ void FileList::getList(const char *initDir, const char *specfile){
 //¥Ê¥¢ ‰≥ˆÕº∆¨
 void WriteBMP(string file_name, int file_num, Mat& r, Mat& t)//
 {
-	string dst_pathname1 = "C:/Users/eva72/Desktop/—Ã“∂CACHE/cor/";
+	string dst_pathname1 = "C:/Users/eva72/Desktop/—Ã“∂CACHE/cuttail/";
 	char temp[4];
 	itoa(file_num + 1, temp, 10);
 	string dst_num = temp;

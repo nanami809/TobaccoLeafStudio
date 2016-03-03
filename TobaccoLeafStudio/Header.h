@@ -11,6 +11,8 @@ using namespace cv;
 
 
 //函数声明
+
+//GetFiles函数组
 void WriteBMP(string file_name, int file_num, Mat &r, Mat &t);
 void BlurImage(Mat &r, Mat &t, Mat &dst_r, Mat &dst_t);
 //void showMat(Mat arr);
@@ -20,8 +22,14 @@ void SegmentationImage(Mat &r, Mat &t, Mat &dst_r, Mat &dst_t);
 int Getthreshold_Gray(Mat &srcImage);
 int Getthreshold_CV(Mat &srcImage);
 int Getthreshold_DieDai(Mat &srcImage,Mat &dst);//单通道图像
-void FillImage(Mat &t);
+//void FillImage(Mat &t);
 void Showhist(Mat &srcImage);
+
+//Getvalue函数组
+RotatedRect GetRotatedRect(Mat &r);
+Mat GetLeafwide(Mat &r);
+void RotateLeaf(Mat &r, Mat &t);
+void CutandRotate(Mat &r,Mat &t ,Mat &dst_r,Mat &dst_t);
 
 
 //类
