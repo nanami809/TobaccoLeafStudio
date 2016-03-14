@@ -16,6 +16,7 @@ int main(){
 		cout << "´íÎó£¡Í¼Æ¬²»Åä¶Ô";
 		return -1;
 	}
+	vector<vector<double>> imgs_value;
 	for (int img_num = 0; img_num < imgs_R.qty; img_num++){
 		Mat img_R = imread(imgs_R.names[img_num], -1);
 		Mat img_T = imread(imgs_T.names[img_num], -1);
@@ -45,15 +46,9 @@ int main(){
 
 		
 		*/
+		imgs_value.push_back(GetValue(img_R, img_T));
 
-     //Í¼ÏñÐý×ª
-		//¼ÆËã¿í¶È
-		Mat cut_R, cut_T;
-		CutandRotate(img_R, img_T, cut_R, cut_T);
 
-		//±£´æÍ¼Ïñ
-		string dst_filename = "cuttail.bmp";
-		WriteBMP(dst_filename, img_num, cut_R, cut_T);
 
 
 		
@@ -128,6 +123,16 @@ int main(){
 
 	
 	*/
+	ofstream outfile("C:/Users/eva72/Desktop/ÑÌÒ¶CACHE/images_value.xls");
+	for (int k = 0; k<imgs_R.qty; k++)
+	{
+		vector<double> temp = imgs_value[k];
+		for (int j = 0; j<8; j++)
+		{
+			outfile <<temp[j]  << "\t";
+		}
+		outfile << endl;
+	} 
 
 
 		
