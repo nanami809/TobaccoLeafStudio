@@ -1,27 +1,84 @@
 #include"Header.h"
 
-vector<double> GetValue(Mat &r, Mat &t){
+//获得分区颜色值
+vector<double> CalLabValue(Mat &r, Mat &t, vector<vector<Point>> Points){
+	vector<double> TriColors;
+	double temp[6];
+	double sum[3][6] = { 0 };
+	int num_pieces = 3;
+	for (int k = 0; k < num_pieces; k++){
+		int num_pp = Points[k].size();
+		for (int i = 0; i < num_pp; i++){
+			//x,y顺序不能搞错了……
+			sum[k][0] += ((double)(r.at<Vec3b>(Points[k][i].y, Points[k][i].x)[0])/255*100);
+			sum[k][1] += ((double)(r.at<Vec3b>(Points[k][i].y, Points[k][i].x)[1])-128);
+			sum[k][2] += ((double)(r.at<Vec3b>(Points[k][i].y, Points[k][i].x)[2])-128);
+			sum[k][3] += ((double)(t.at<Vec3b>(Points[k][i].y, Points[k][i].x)[0]) / 255 * 100);
+			sum[k][4] += ((double)(t.at<Vec3b>(Points[k][i].y, Points[k][i].x)[1])-128);
+			sum[k][5] += ((double)(t.at<Vec3b>(Points[k][i].y, Points[k][i].x)[2])-128);
+		}
+		temp[0] = sum[k][0] / num_pp;
+		temp[1] = sum[k][1] / num_pp;
+		temp[2] = sum[k][2] / num_pp;
+		temp[3] = sum[k][3] / num_pp;
+		temp[4] = sum[k][4] / num_pp;
+		temp[5] = sum[k][5] / num_pp;
+
+		TriColors.push_back(temp[0]);
+		TriColors.push_back(temp[1]);
+		TriColors.push_back(temp[2]);
+		TriColors.push_back(temp[3]);
+		TriColors.push_back(temp[4]);
+		TriColors.push_back(temp[5]);
+
+	}
+	return TriColors;
+}
+
+
+vector<vector<Point>> GetPerPoints(Mat &mask){
+	vector<vector<Point>> perPoints;//区域点集
 
 	vector<double> Value;
 
-	//图像去梗、旋转
-	Mat cut_R, cut_T;
-	Mat mask(r.size(), CV_8UC1);
-	
-	vector<Point> LeafPoints = CutandRotate(r, t, cut_R, cut_T,mask);
+	//用外周矩求烟叶长
+	Rect brect = boundingRect(mask);
 
+	//求分区域点集
+	int length = brect.width;
+	int perlen = length / 3;
+	if (perlen * 3 < length) perlen++;
+
+	float radius[3];
+	for (int k = 0; k < 3; k++){
+		Rect window = Rect(Point(60 + k*perlen, 0), Point(60 + (k + 1)*perlen, mask.rows));
+		vector<Point> Ptemp;
+		for (int i = 0; i < mask.rows; i++){
+			for (int j = 0; j < perlen; j++){
+				if (mask(window).at<uchar>(i, j) == 255){
+					Ptemp.push_back(Point(60 + k*perlen + j, i));
+				}
+			}
+		}
+		perPoints.push_back(Ptemp);
+	}
+	return perPoints;
+}
+
+vector<double> GetValue(vector<Point> LeafPoints,Mat &mask){
+	vector<double> Value;
 	//求最小外周矩
 	Rect brect = boundingRect(Mat(LeafPoints));
 	//求分区域点集
 	int length = brect.width;
 	int perlen = length / 3;
 	if (perlen * 3 < length) perlen++;
-	vector<vector<Point>> perPoints;
+	vector<vector<Point>> perPoints;//区域点集
 	float radius[3];
 	for (int k = 0; k < 3; k++){
-		Rect window = Rect(Point(60+k*perlen, 0), Point(60 + (k+1)*perlen, r.rows));
+		Rect window = Rect(Point(60 + k*perlen, 0), Point(60 + (k + 1)*perlen, mask.rows));
 		vector<Point> Ptemp;
-		for (int i = 0; i < r.rows; i++){
+		for (int i = 0; i < mask.rows; i++){
 			for (int j = 0; j < perlen; j++){
 				if (mask(window).at<uchar>(i, j) == 255){
 					Ptemp.push_back(Point(60 + k*perlen+j, i));
@@ -39,7 +96,7 @@ vector<double> GetValue(Mat &r, Mat &t){
 		*/
 
 		//分块绘制外接矩形
-		Mat per_mask(r.size(), CV_8UC1, Scalar::all(0));
+		Mat per_mask(mask.size(), CV_8UC1, Scalar::all(0));
 		Rect perRect = boundingRect(Mat(Ptemp));
 		Mat white(perRect.size(), CV_8UC1, Scalar::all(255));
 		white.copyTo(per_mask(perRect));
@@ -102,102 +159,6 @@ double CalRoundness(Mat &mask, Mat &circle_mask){
 
 
 
-void RotateLeaf(Mat &r, Mat &t){
-	Point Left, Right; bool flag = 0;
-	for (int j = 0; j < r.cols; j++){
-		if (flag) break;
-		for (int i = 0; i < r.rows; i++){
-			if (r.at<Vec3b>(i, j)[0] != 255 || r.at<Vec3b>(i, j)[1] != 255 || r.at<Vec3b>(i, j)[2] != 255){
-				Left.x = j;
-				Left.y = i;
-				flag = 1;
-				break;
-			}
-		}
-	}
-	flag = 0;
-	for (int j = r.cols - 1; j >= 0; j--){
-		if (flag) break;
-		for (int i = r.rows - 1; i >= 0; i--){
-			if (r.at<Vec3b>(i, j)[0] != 255 || r.at<Vec3b>(i, j)[1] != 255 || r.at<Vec3b>(i, j)[2] != 255){
-				Right.x = j;
-				Right.y = i;
-				flag = 1;
-				break;
-			}
-		}
-	}
-
-	double s = (double)(Right.y - Left.y) / (double)(Right.x - Left.x);
-	double angle = atan(s) * 180 / CV_PI;
-	Mat temp = getRotationMatrix2D(Left, angle, 1);
-	Mat dst;
-	warpAffine(r, r, temp, r.size(), INTER_NEAREST, 0, Scalar(255, 255, 255));
-	warpAffine(t, t, temp, r.size(), INTER_NEAREST, 0, Scalar(0, 0, 0));
-	//平移
-	//Point2f middle = Point2f((Left.x + Right.x) / 2, (Left.y + Right.y) / 2);
-	Point2f srcTriangle[3];
-	Point2f dstTriangle[3];
-	srcTriangle[0] = Left;
-	dstTriangle[0] = Point2f(60, 308);
-	srcTriangle[1] = Point2f(0, 0);
-	dstTriangle[1] = Point2f(60 - Left.x, 308 - Left.y);
-	srcTriangle[2] = Point2f(100, 100);
-	dstTriangle[2] = Point2f(100 + 60 - Left.x, 100 + 308 - Left.y);
-	Mat	warpMat = getAffineTransform(srcTriangle, dstTriangle);
-	warpAffine(r, r, warpMat, r.size(), INTER_NEAREST, 0, Scalar(255, 255, 255));
-	warpAffine(t, t, warpMat, r.size(), INTER_NEAREST, 0, Scalar(0, 0, 0));
-
-
-}
-
-vector<Point> CutandRotate(Mat &r, Mat &t, Mat &dst_r, Mat &dst_t,Mat &mask){
-	int cutposition = 0;
-	Mat w = GetLeafwide(r);
-	medianBlur(w, w, 5);
-	vector<double> slopes;
-	double maxValue;
-	Point maxIdx;
-	minMaxLoc(w, 0, &maxValue, 0, &maxIdx);
-	for (int i = maxIdx.x + 20; i <r.cols; i++){
-		double temp = ((double)w.at<ushort>(0, i - 20) - (double)w.at<ushort>(0, i)) / 20;
-		slopes.push_back(temp);
-	}
-	for (int i = r.cols - 1; i >= 0; i--){
-		int s = i - (r.cols - slopes.size());
-		if (s >= 0 && w.at<ushort>(0, i) < 20 && slopes[s]< 1){
-			Mat white(Size(r.cols - i, r.rows), CV_8UC3, Scalar(255, 255, 255));
-			Mat black(Size(r.cols - i, r.rows), CV_8UC3, Scalar(0, 0, 0));
-			Rect window = Rect(Point(i, 0), Point(r.cols, r.rows));
-			white.copyTo(r(window));
-			black.copyTo(t(window));
-		}
-		else if (s < 0) break;
-	}
-
-	
-	RotateLeaf(r, t);
-	r.copyTo(dst_r);
-	t.copyTo(dst_t);
-
-	
-
-	vector<Point> points;
-	for (int i = 0; i < r.rows; i++){
-		for (int j = 0; j < r.cols; j++){
-			if (r.at<Vec3b>(i, j)[0] == 255 && r.at<Vec3b>(i, j)[1] == 255 && r.at<Vec3b>(i, j)[2] == 255){
-				mask.at<uchar>(i, j) = 0;
-			}
-			else {
-				points.push_back(Point(j, i));
-				mask.at<uchar>(i, j) = 255;
-			}
-
-		}
-	}
-
-	return points;
-}
 
 
 Mat GetLeafwide(Mat &r){

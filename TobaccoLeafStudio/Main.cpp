@@ -17,6 +17,7 @@ int main(){
 		return -1;
 	}
 	vector<vector<double>> imgs_value;
+	vector<vector<double>> LabColors;
 	for (int img_num = 0; img_num < imgs_R.qty; img_num++){
 		Mat img_R = imread(imgs_R.names[img_num], -1);
 		Mat img_T = imread(imgs_T.names[img_num], -1);
@@ -44,16 +45,31 @@ int main(){
 		white.copyTo(img_seg_R(recwindow));
 		black.copyTo(img_seg_T(recwindow));
 
+
+		
+
 		
 		*/
-		imgs_value.push_back(GetValue(img_R, img_T));
+		//图像去梗、旋转
+		Mat cut_R, cut_T;
+		Mat mask(img_R.size(), CV_8UC1);
+		vector<Point> LeafPoints = CutandRotate(img_R, img_T, cut_R, cut_T, mask);
+
+		//求分段点集
+		vector<vector<Point>> PerPoints;
+		PerPoints =  GetPerPoints(mask);
+
+		//将RGB图像转换为Lab
+		Mat Lab_R, Lab_T;
+		cvtColor(cut_R, Lab_R, CV_RGB2Lab);
+		cvtColor(cut_T, Lab_T, CV_RGB2Lab);
+
+		//统计Lab分区位颜色
+		LabColors.push_back(CalLabValue(Lab_R, Lab_T, PerPoints));
 
 
 
-
-		
-
-		
+		//imgs_value.push_back(GetValue(LeafPoints, mask));
 		
 
 
@@ -123,11 +139,11 @@ int main(){
 
 	
 	*/
-	ofstream outfile("C:/Users/eva72/Desktop/烟叶CACHE/images_value.xls");
+	ofstream outfile("C:/Users/eva72/Desktop/烟叶CACHE/images_LABcolorvalue.xls");
 	for (int k = 0; k<imgs_R.qty; k++)
 	{
-		vector<double> temp = imgs_value[k];
-		for (int j = 0; j<8; j++)
+		vector<double> temp = LabColors[k];
+		for (int j = 0; j<18; j++)
 		{
 			outfile <<temp[j]  << "\t";
 		}

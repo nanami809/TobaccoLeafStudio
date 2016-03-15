@@ -490,6 +490,106 @@ int Getthreshold_DieDai(Mat &srcImage, Mat &dst){
 	return t;
 }
 
+
+void RotateLeaf(Mat &r, Mat &t){
+	Point Left, Right; bool flag = 0;
+	for (int j = 0; j < r.cols; j++){
+		if (flag) break;
+		for (int i = 0; i < r.rows; i++){
+			if (r.at<Vec3b>(i, j)[0] != 255 || r.at<Vec3b>(i, j)[1] != 255 || r.at<Vec3b>(i, j)[2] != 255){
+				Left.x = j;
+				Left.y = i;
+				flag = 1;
+				break;
+			}
+		}
+	}
+	flag = 0;
+	for (int j = r.cols - 1; j >= 0; j--){
+		if (flag) break;
+		for (int i = r.rows - 1; i >= 0; i--){
+			if (r.at<Vec3b>(i, j)[0] != 255 || r.at<Vec3b>(i, j)[1] != 255 || r.at<Vec3b>(i, j)[2] != 255){
+				Right.x = j;
+				Right.y = i;
+				flag = 1;
+				break;
+			}
+		}
+	}
+
+	double s = (double)(Right.y - Left.y) / (double)(Right.x - Left.x);
+	double angle = atan(s) * 180 / CV_PI;
+	Mat temp = getRotationMatrix2D(Left, angle, 1);
+	Mat dst;
+	warpAffine(r, r, temp, r.size(), INTER_NEAREST, 0, Scalar(255, 255, 255));
+	warpAffine(t, t, temp, r.size(), INTER_NEAREST, 0, Scalar(0, 0, 0));
+	//平移
+	//Point2f middle = Point2f((Left.x + Right.x) / 2, (Left.y + Right.y) / 2);
+	Point2f srcTriangle[3];
+	Point2f dstTriangle[3];
+	srcTriangle[0] = Left;
+	dstTriangle[0] = Point2f(60, 308);
+	srcTriangle[1] = Point2f(0, 0);
+	dstTriangle[1] = Point2f(60 - Left.x, 308 - Left.y);
+	srcTriangle[2] = Point2f(100, 100);
+	dstTriangle[2] = Point2f(100 + 60 - Left.x, 100 + 308 - Left.y);
+	Mat	warpMat = getAffineTransform(srcTriangle, dstTriangle);
+	warpAffine(r, r, warpMat, r.size(), INTER_NEAREST, 0, Scalar(255, 255, 255));
+	warpAffine(t, t, warpMat, r.size(), INTER_NEAREST, 0, Scalar(0, 0, 0));
+
+
+}
+
+vector<Point> CutandRotate(Mat &r, Mat &t, Mat &dst_r, Mat &dst_t, Mat &mask){
+	int cutposition = 0;
+	Mat w = GetLeafwide(r);
+	medianBlur(w, w, 5);
+	vector<double> slopes;
+	double maxValue;
+	Point maxIdx;
+	minMaxLoc(w, 0, &maxValue, 0, &maxIdx);
+	for (int i = maxIdx.x + 20; i <r.cols; i++){
+		double temp = ((double)w.at<ushort>(0, i - 20) - (double)w.at<ushort>(0, i)) / 20;
+		slopes.push_back(temp);
+	}
+	for (int i = r.cols - 1; i >= 0; i--){
+		int s = i - (r.cols - slopes.size());
+		if (s >= 0 && w.at<ushort>(0, i) < 20 && slopes[s]< 1){
+			Mat white(Size(r.cols - i, r.rows), CV_8UC3, Scalar(255, 255, 255));
+			Mat black(Size(r.cols - i, r.rows), CV_8UC3, Scalar(0, 0, 0));
+			Rect window = Rect(Point(i, 0), Point(r.cols, r.rows));
+			white.copyTo(r(window));
+			black.copyTo(t(window));
+		}
+		else if (s < 0) break;
+	}
+
+
+	RotateLeaf(r, t);
+	r.copyTo(dst_r);
+	t.copyTo(dst_t);
+
+
+
+	vector<Point> points;
+	for (int i = 0; i < r.rows; i++){
+		for (int j = 0; j < r.cols; j++){
+			if (r.at<Vec3b>(i, j)[0] == 255 && r.at<Vec3b>(i, j)[1] == 255 && r.at<Vec3b>(i, j)[2] == 255){
+				mask.at<uchar>(i, j) = 0;
+			}
+			else {
+				points.push_back(Point(j, i));
+				mask.at<uchar>(i, j) = 255;
+			}
+
+		}
+	}
+
+	return points;
+}
+
+
+
 //对全局灰度图像迭代法（对比需要）
 /*
 Mat temp;

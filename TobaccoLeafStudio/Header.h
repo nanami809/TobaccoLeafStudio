@@ -31,8 +31,11 @@ Mat GetLeafwide(Mat &r);
 void RotateLeaf(Mat &r, Mat &t);
 vector<Point> CutandRotate(Mat &r, Mat &t, Mat &dst_r, Mat &dst_t,Mat &mask);
 
+
 //Getvalue函数组
-vector<double> GetValue(Mat &r, Mat &t);
+vector<double> CalLabValue(Mat &r, Mat &t, vector<vector<Point>> Points);//获得分区颜色值
+vector<vector<Point>> GetPerPoints(Mat &mask);
+vector<double> GetValue(vector<Point> LeafPoints, Mat &mask);
 RotatedRect GetRotatedRect(Mat &r);
 double CalRoundness(Mat &mask, Mat &circle_mask);
 
@@ -48,5 +51,6 @@ private:
 	string dir;
 	string spec;
 };
+
 
 
